@@ -120,6 +120,7 @@ function securityHeadersObj(pathname = '') {
   } else if (pathname === '/manifest.json') {
     cacheControl = 'public, max-age=86400';
   } else if (pathname.startsWith('/games/')) {
+    // All 20 game files get 1-day cache
     cacheControl = 'public, max-age=86400';
   } else if (pathname === '/style.css' || pathname === '/script.js') {
     cacheControl = 'public, max-age=86400';
