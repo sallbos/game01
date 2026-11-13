@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Street Racing</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Arial', sans-serif;
+    overflow: hidden;
+    touch-action: none;
+  }
+  #gameCanvas {
+    display: block;
+    max-width: 100vw;
+    max-height: 100vh;
+    image-rendering: pixelated;
+  }
+  #mobileControls {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding: 10px;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .ctrl-btn {
+    pointer-events: all;
+    background: rgba(108,0,255,0.35);
+    border: 2px solid #6c00ff;
+    color: #e8e8f0;
+    border-radius: 12px;
+    font-size: 22px;
+    font-weight: bold;
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #btnLeft  { width: 70px; height: 70px; }
+  #btnRight { width: 70px; height: 70px; }
+  #btnNitro { width: 100px; height: 70px; font-size: 14px; background: rgba(255,120,0,0.4); border-color: #ff7800; }
+  #mobileControls .left-side  { display: flex; gap: 8px; }
+  #mobileControls .right-side { display: flex; gap: 8px; }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas" width="800" height="480"></canvas>
+<div id="mobileControls">
+  <div class="left-side">
+    <div class="ctrl-btn" id="btnLeft">◀</div>
+  </div>
+  <div class="right-side">
+    <div class="ctrl-btn" id="btnNitro">NITRO</div>
+    <div class="ctrl-btn" id="btnRight">▶</div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+// ─── CANVAS SETUP ──────────────────────────────────────────────────────────
+const canvas = document.getElementById('gameCanvas');
+const ctx    = canvas.getContext('2d');
+const W = 800, H = 480;
+
+function resizeCanvas() {
+  const scaleX = window.innerWidth  / W;
+  const scaleY = window.innerHeight / H;
+  const scale  = Math.min(scaleX, scaleY);
+  canvas.style.width  = (W * scale) + 'px';
+  canvas.style.height = (H * scale) + 'px';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// ─── CONSTANTS ─────────────────────────────────────────────────────────────
+const HORIZON   = H * 0.42;      // y of vanishing point
+const VP_X      = W / 2;         // vanishing point x
+const SEG_COUNT = 150;           // road segments
+const ROAD_W_BOTTOM = 520;       // road width at bottom
+const ROAD_W_TOP    = 60;        // road width at horizon
+const LOCAL_KEY_BEST = 'sr_best';
+
+// ─── STATE ─────────────────────────────────────────────────────────────────
+let state = 'start'; // 'start' | 'play' | 'gameover'
+let raf;
+
+const game = {
+  distance: 0,
+  score: 0,
+  multiplier: 1,
+  comboCount: 0,
+  lives: 3,
+  speed: 60,          // km/h
+  t: 0,               // frame counter
+  cameraX: 0,         // road curve offset
+  curveAmt: 0,        // current curve amount
+  curveSeed: 0,
+  nightProgress: 0,   // 0..1
+  shake: 0,
+  flashAlpha: 0,
+  fanfareText: '',
+  fanfareTimer: 0,
+  comboText: '',
+  comboTimer: 0,
+  nitroActive: false,
+  nitroCooldown: 0,   // seconds
+  nitroDuration: 0,   // seconds remaining
+  nitroParticles: [],
+  crashTimer: 0,      // spin animation
+  milestones: [500, 1000, 2000, 5000],
+  passedMilestones: new Set()
+};
+
+const player = {
+  x: W / 2,
+  lean: 0,          // -1..1 for tilt
+  crashAngle: 0
+};
+
+// Traffic cars
+const TRAFFIC_COLORS = ['#e74c3c','#f1c40f','#ecf0f1','#95a5a6','#e67e22'];
+const TRAFFIC_TYPES  = [
+  { w: 44, h: 70 },   // sedan
+  { w: 48, h: 80 },   // SUV
+  { w: 56, h: 90 },   // truck
+  { w: 38, h: 65 },   // sports
+  { w: 50, h: 85 },   // van
+];
+let trafficCars = [];
+let trafficSpawnTimer = 0;
+
+// Input state
+const keys = {};
+let touchLeft = false, touchRight = false, touchNitro = false;
+
+// Best distance
+let bestDist = parseInt(localStorage.getItem(LOCAL_KEY_BEST) || '0');
+
+// ─── INPUT ─────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if ((e.code === 'Space' || e.code === 'KeyN') && state === 'play') activateNitro();
+  if (e.code === 'Enter' || e.code === 'Space') {
+    if (state === 'start') startGame();
+    if (state === 'gameover') startGame();
+  }
+  e.preventDefault();
+}, { passive: false });
+document.addEventListener('keyup', e => { keys[e.code] = false; });
+
+// Mobile buttons
+function setupBtn(id, setter) {
+  const el = document.getElementById(id);
+  el.addEventListener('touchstart', e => { e.preventDefault(); setter(true); },  { passive: false });
+  el.addEventListener('touchend',   e => { e.preventDefault(); setter(false); }, { passive: false });
+  el.addEventListener('mousedown',  e => { e.preventDefault(); setter(true); });
+  el.addEventListener('mouseup',    e => { e.preventDefault(); setter(false); });
+}
+setupBtn('btnLeft',  v => { touchLeft  = v; });
+setupBtn('btnRight', v => { touchRight = v; });
+setupBtn('btnNitro', v => { if (v && state === 'play') activateNitro(); });
+
+// Canvas tap for start/restart
+canvas.addEventListener('click', () => {
+  if (state === 'start')    startGame();
+  if (state === 'gameover') startGame();
+});
+
+// ─── GAME LOGIC ────────────────────────────────────────────────────────────
+function startGame() {
+  game.distance     = 0;
+  game.score        = 0;
+  game.multiplier   = 1;
+  game.comboCount   = 0;
+  game.lives        = 3;
+  game.speed        = 60;
+  game.t            = 0;
+  game.cameraX      = 0;
+  game.curveAmt     = 0;
+  game.nightProgress = 0;
+  game.shake        = 0;
+  game.flashAlpha   = 0;
+  game.fanfareTimer = 0;
+  game.comboTimer   = 0;
+  game.nitroActive  = false;
+  game.nitroCooldown = 0;
+  game.nitroDuration = 0;
+  game.nitroParticles = [];
+  game.crashTimer   = 0;
+  game.passedMilestones = new Set();
+  player.x          = W / 2;
+  player.lean       = 0;
+  player.crashAngle = 0;
+  trafficCars       = [];
+  trafficSpawnTimer = 0;
+  state = 'play';
+}
+
+function activateNitro() {
+  if (game.nitroCooldown > 0 || game.nitroActive) return;
+  game.nitroActive   = true;
+  game.nitroDuration = 3;
+  game.nitroCooldown = 10;
+}
+
+function spawnTraffic() {
+  const type  = TRAFFIC_TYPES [Math.floor(Math.random() * TRAFFIC_TYPES.length)];
+  const color = TRAFFIC_COLORS[Math.floor(Math.random() * TRAFFIC_COLORS.length)];
+  // lane: -1, 0, 1
+  const lane  = (Math.random() < 0.33 ? -1 : Math.random() < 0.5 ? 0 : 1);
+  trafficCars.push({
+    z: 0.01,          // depth 0=far 1=near
+    lane, color,
+    w: type.w, h: type.h,
+    passed: false,
+    alive: true
+  });
+}
+
+function roadXAt(z) {
+  // Returns the road center x at depth z (0=far,1=near)
+  // curve offset applied
+  return VP_X + game.cameraX * (1 - z) * 0.5;
+}
+
+function roadWidthAt(z) {
+  return ROAD_W_TOP + (ROAD_W_BOTTOM - ROAD_W_TOP) * z;
+}
+
+function screenYAt(z) {
+  return HORIZON + (H - HORIZON) * z;
+}
+
+function getCarScreenPos(car) {
+  const z    = car.z;
+  const cx   = roadXAt(z) + car.lane * roadWidthAt(z) * 0.28;
+  const cy   = screenYAt(z);
+  const scale = 0.15 + z * 0.85;
+  return { cx, cy, scale, sw: car.w * scale, sh: car.h * scale };
+}
+
+function update(dt) {
+  game.t += dt;
+
+  // Speed auto-ramp
+  const baseSpeed = Math.min(180, 60 + game.t / 60 * 120);
+  let   speed     = baseSpeed;
+
+  // Nitro
+  if (game.nitroActive) {
+    game.nitroDuration -= dt;
+    speed += 80;
+    if (game.nitroDuration <= 0) { game.nitroActive = false; }
+    // particles
+    for (let i = 0; i < 4; i++) {
+      game.nitroParticles.push({
+        x: player.x + (Math.random() - 0.5) * 20,
+        y: H - 60 + Math.random() * 20,
+        vx: (Math.random() - 0.5) * 60,
+        vy: 60 + Math.random() * 100,
+        life: 0.3 + Math.random() * 0.3,
+        maxLife: 0.6
+      });
+    }
+  }
+  if (!game.nitroActive && game.nitroCooldown > 0) {
+    game.nitroCooldown -= dt;
+    if (game.nitroCooldown < 0) game.nitroCooldown = 0;
+  }
+
+  // Crash slow-down
+  if (game.crashTimer > 0) {
+    game.crashTimer -= dt;
+    speed *= 0.3;
+    player.crashAngle += dt * 720; // spin degrees
+  } else {
+    player.crashAngle = 0;
+  }
+
+  game.speed = speed;
+
+  // Distance
+  const metersThisFrame = (speed / 3.6) * dt; // m
+  game.distance += metersThisFrame;
+  game.score    += Math.floor(metersThisFrame * game.multiplier);
+
+  // Night progress
+  game.nightProgress = Math.min(1, (game.distance - 1000) / 1000);
+  if (game.nightProgress < 0) game.nightProgress = 0;
+
+  // Curve
+  game.curveSeed += dt * 0.3;
+  game.curveAmt   = Math.sin(game.curveSeed) * 60;
+  game.cameraX    = game.curveAmt;
+
+  // Steering
+  const steerLeft  = keys['ArrowLeft']  || keys['KeyA'] || touchLeft;
+  const steerRight = keys['ArrowRight'] || keys['KeyD'] || touchRight;
+  const steerSpeed = 180;
+
+  if (steerLeft  && game.crashTimer <= 0) { player.x -= steerSpeed * dt; player.lean = Math.max(player.lean - dt * 4, -1); }
+  else if (steerRight && game.crashTimer <= 0) { player.x += steerSpeed * dt; player.lean = Math.min(player.lean + dt * 4, 1); }
+  else { player.lean *= 0.88; }
+
+  // Clamp player to road
+  const roadHalfW = ROAD_W_BOTTOM * 0.46;
+  player.x = Math.max(W / 2 - roadHalfW, Math.min(W / 2 + roadHalfW, player.x));
+
+  // Traffic spawn
+  trafficSpawnTimer -= dt;
+  if (trafficSpawnTimer <= 0) {
+    spawnTraffic();
+    trafficSpawnTimer = 1.2 - Math.min(0.8, game.t / 120);
+  }
+
+  // Update traffic
+  const advanceSpeed = (speed / 180) * 0.55 * dt;
+  trafficCars.forEach(car => {
+    car.z += advanceSpeed;
+
+    // Passed check
+    if (!car.passed && car.z > 0.75) {
+      car.passed = true;
+      game.comboCount++;
+      game.multiplier = 1 + Math.floor(game.comboCount / 3) * 0.5;
+      if (game.comboCount >= 5 && game.comboCount % 5 === 0) {
+        game.comboText  = `COMBO ×${game.comboCount}!`;
+        game.comboTimer = 2;
+      }
+    }
+
+    // Collision check (when car is in near zone)
+    if (car.alive && car.z > 0.7 && car.z < 1.05) {
+      const { cx, sw, sh } = getCarScreenPos(car);
+      const playerCX = player.x;
+      const playerY  = H - 70;
+      const playerW  = 50;
+
+      if (Math.abs(cx - playerCX) < (sw / 2 + playerW / 2) * 0.6 &&
+          Math.abs(screenYAt(car.z) - playerY) < (sh / 2 + 40) * 0.5) {
+        // Collision!
+        if (game.crashTimer <= 0) {
+          car.alive = false;
+          game.lives--;
+          game.crashTimer = 1.2;
+          game.shake      = 0.4;
+          game.flashAlpha = 0.6;
+          game.multiplier = 1;
+          game.comboCount = 0;
+          if (game.lives <= 0) endGame();
+        }
+      }
+    }
+  });
+
+  // Remove off-screen traffic
+  trafficCars = trafficCars.filter(c => c.z < 1.1);
+
+  // Nitro particles
+  game.nitroParticles.forEach(p => {
+    p.x    += p.vx * dt;
+    p.y    += p.vy * dt;
+    p.life -= dt;
+  });
+  game.nitroParticles = game.nitroParticles.filter(p => p.life > 0);
+
+  // Shake decay
+  if (game.shake > 0) game.shake -= dt * 2;
+  if (game.shake < 0) game.shake = 0;
+
+  // Flash decay
+  if (game.flashAlpha > 0) game.flashAlpha -= dt * 2;
+
+  // Fanfare
+  if (game.fanfareTimer > 0) game.fanfareTimer -= dt;
+  if (game.comboTimer   > 0) game.comboTimer   -= dt;
+
+  // Milestones
+  game.milestones.forEach(m => {
+    if (game.distance >= m && !game.passedMilestones.has(m)) {
+      game.passedMilestones.add(m);
+      game.fanfareText  = m >= 1000 ? `${m/1000}KM!` : `${m}M!`;
+      game.fanfareTimer = 2.5;
+    }
+  });
+}
+
+function endGame() {
+  if (game.distance > bestDist) {
+    bestDist = Math.floor(game.distance);
+    localStorage.setItem(LOCAL_KEY_BEST, bestDist);
+  }
+  state = 'gameover';
+}
+
+// ─── DRAWING ───────────────────────────────────────────────────────────────
+
+function drawSky() {
+  const night = game.nightProgress;
+  const c1 = lerpColor('#1a6db5','#050a1a', night);
+  const c2 = lerpColor('#aad4f5','#0a0a0f', night);
+  const grad = ctx.createLinearGradient(0, 0, 0, HORIZON);
+  grad.addColorStop(0, c1);
+  grad.addColorStop(1, c2);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, HORIZON);
+
+  // Stars (night only)
+  if (night > 0.3) {
+    ctx.fillStyle = `rgba(255,255,255,${(night - 0.3) * 1.4})`;
+    for (let i = 0; i < 80; i++) {
+      const sx = hashRand(i, 0) * W;
+      const sy = hashRand(i, 1) * HORIZON * 0.9;
+      ctx.fillRect(sx, sy, 1.5, 1.5);
+    }
+  }
+
+  // Sun/moon
+  if (night < 0.7) {
+    ctx.fillStyle = `rgba(255,235,160,${1 - night})`;
+    ctx.beginPath();
+    ctx.arc(W * 0.75, HORIZON * 0.3, 24, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.fillStyle = `rgba(220,230,255,${night})`;
+    ctx.beginPath();
+    ctx.arc(W * 0.75, HORIZON * 0.3, 18, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawGrass() {
+  // Left grass
+  ctx.fillStyle = lerpColor('#1a5c1a','#0a3010', game.nightProgress);
+  ctx.fillRect(0, HORIZON, W, H - HORIZON);
+
+  // Animated grass stripes
+  const stripeCount = 10;
+  for (let i = 0; i < stripeCount; i++) {
+    const t = (i / stripeCount + game.t * 0.1) % 1;
+    const y1 = HORIZON + t * (H - HORIZON);
+    const y2 = HORIZON + ((i + 1) / stripeCount + game.t * 0.1) % 1 * (H - HORIZON);
+    if (i % 2 === 0) {
+      ctx.fillStyle = lerpColor('#1a6e1a','#0d3d12', game.nightProgress);
+      ctx.fillRect(0, y1, 120, Math.max(0, y2 - y1));
+      ctx.fillRect(W - 120, y1, 120, Math.max(0, y2 - y1));
+    }
+  }
+}
+
+function drawRoad() {
+  // Draw road segments from far to near
+  for (let i = SEG_COUNT - 1; i >= 0; i--) {
+    const z1 = i       / SEG_COUNT;
+    const z2 = (i + 1) / SEG_COUNT;
+
+    const y1  = screenYAt(z1);
+    const y2  = screenYAt(z2);
+    const cx1 = roadXAt(z1);
+    const cx2 = roadXAt(z2);
+    const hw1 = roadWidthAt(z1) / 2;
+    const hw2 = roadWidthAt(z2) / 2;
+
+    // Road surface color
+    const isAlt = i % 2 === 0;
+    const roadCol  = lerpColor(isAlt ? '#3a3a3a' : '#2e2e2e', '#181818', game.nightProgress);
+    ctx.fillStyle  = roadCol;
+    ctx.beginPath();
+    ctx.moveTo(cx1 - hw1, y1);
+    ctx.lineTo(cx1 + hw1, y1);
+    ctx.lineTo(cx2 + hw2, y2);
+    ctx.lineTo(cx2 - hw2, y2);
+    ctx.closePath();
+    ctx.fill();
+
+    // Centre dashes (every 4 segs)
+    if (i % 4 === 0) {
+      ctx.fillStyle = lerpColor('#f0d060','#808040', game.nightProgress);
+      const lw = Math.max(1, 4 * z2);
+      const lh = Math.abs(y2 - y1);
+      ctx.fillRect(cx2 - lw / 2, y1, lw, lh * 0.6);
+    }
+
+    // Edge lines
+    ctx.strokeStyle = lerpColor('#ffffff','#888888', game.nightProgress);
+    ctx.lineWidth   = Math.max(0.5, 2 * z2);
+    ctx.beginPath();
+    ctx.moveTo(cx1 - hw1, y1); ctx.lineTo(cx2 - hw2, y2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx1 + hw1, y1); ctx.lineTo(cx2 + hw2, y2);
+    ctx.stroke();
+  }
+}
+
+function drawTrees() {
+  const treePositions = [
+    { lane: -0.65, seed: 10 },
+    { lane:  0.65, seed: 20 },
+    { lane: -0.78, seed: 30 },
+    { lane:  0.78, seed: 40 },
+  ];
+
+  for (let i = 0; i < 20; i++) {
+    const z = ((i / 20) + game.t * 0.05) % 1;
+    const y = screenYAt(z);
+    if (y < HORIZON + 5) continue;
+    const scale = 0.2 + z * 0.8;
+
+    treePositions.forEach((tp, ti) => {
+      const cx   = roadXAt(z) + tp.lane * roadWidthAt(z) * 0.72;
+      // Trunk
+      const tw   = 4 * scale;
+      const th   = 30 * scale;
+      ctx.fillStyle = lerpColor('#4a3010','#1a1008', game.nightProgress);
+      ctx.fillRect(cx - tw / 2, y - th, tw, th);
+      // Canopy
+      const radius = 18 * scale;
+      const treeGreen = lerpColor('#1a7a1a','#0a2a0a', game.nightProgress);
+      ctx.fillStyle   = treeGreen;
+      ctx.beginPath();
+      ctx.arc(cx, y - th - radius * 0.6, radius, 0, Math.PI * 2);
+      ctx.fill();
+      // Night: streetlights near road
+      if (game.nightProgress > 0.3 && Math.abs(tp.lane) < 0.7) {
+        ctx.fillStyle = `rgba(255,220,100,${game.nightProgress * 0.8})`;
+        ctx.beginPath();
+        ctx.arc(cx, y - th, 5 * scale, 0, Math.PI * 2);
+        ctx.fill();
+        // Light cone
+        const coneGrad = ctx.createRadialGradient(cx, y - th, 0, cx, y - th, 40 * scale);
+        coneGrad.addColorStop(0, `rgba(255,220,100,${game.nightProgress * 0.15})`);
+        coneGrad.addColorStop(1, 'rgba(255,220,100,0)');
+        ctx.fillStyle = coneGrad;
+        ctx.beginPath();
+        ctx.arc(cx, y - th, 40 * scale, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    });
+  }
+}
+
+function drawTrafficCar(car) {
+  const { cx, cy, scale, sw, sh } = getCarScreenPos(car);
+  if (!car.alive) return;
+
+  ctx.save();
+  ctx.translate(cx, cy - sh / 2);
+
+  // Car body
+  ctx.fillStyle = car.color;
+  ctx.fillRect(-sw / 2, -sh / 2, sw, sh);
+
+  // Windshield
+  const winH = sh * 0.22;
+  const winW = sw * 0.7;
+  ctx.fillStyle = 'rgba(100,180,255,0.6)';
+  ctx.fillRect(-winW / 2, -sh / 2 + sh * 0.08, winW, winH);
+
+  // Rear windshield
+  ctx.fillStyle = 'rgba(100,180,255,0.4)';
+  ctx.fillRect(-winW / 2, sh / 2 - winH - sh * 0.08, winW, winH);
+
+  // Wheels
+  ctx.fillStyle = '#111';
+  const wheelW = sw * 0.22;
+  const wheelH = sh * 0.14;
+  [[-sw / 2 - wheelW * 0.3, -sh * 0.3], [sw / 2 - wheelW * 0.7, -sh * 0.3],
+   [-sw / 2 - wheelW * 0.3,  sh * 0.2], [sw / 2 - wheelW * 0.7,  sh * 0.2]].forEach(([wx, wy]) => {
+    ctx.fillRect(wx, wy, wheelW, wheelH);
+  });
+
+  // Headlights
+  ctx.fillStyle = '#ffffaa';
+  ctx.fillRect(-sw * 0.35, sh / 2 - sh * 0.08, sw * 0.3, sh * 0.05);
+  ctx.fillRect( sw * 0.05, sh / 2 - sh * 0.08, sw * 0.3, sh * 0.05);
+
+  ctx.restore();
+}
+
+function drawPlayerCar() {
+  ctx.save();
+  ctx.translate(player.x, H - 60);
+  ctx.rotate((player.crashTimer > 0 ? player.crashAngle : player.lean * 8) * Math.PI / 180);
+
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.ellipse(0, 60, 28, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Body
+  const bw = 56, bh = 95;
+  const bodyGrad = ctx.createLinearGradient(-bw/2, 0, bw/2, 0);
+  bodyGrad.addColorStop(0,   '#003a8c');
+  bodyGrad.addColorStop(0.4, '#00b4ff');
+  bodyGrad.addColorStop(1,   '#6c00ff');
+  ctx.fillStyle = bodyGrad;
+  ctx.beginPath();
+  ctx.roundRect(-bw/2, -bh/2, bw, bh, [6, 6, 10, 10]);
+  ctx.fill();
+
+  // Roof taper
+  ctx.fillStyle = '#001a4a';
+  ctx.beginPath();
+  ctx.moveTo(-20, -bh/2);
+  ctx.lineTo(20, -bh/2);
+  ctx.lineTo(14, -bh/2 + 35);
+  ctx.lineTo(-14, -bh/2 + 35);
+  ctx.closePath();
+  ctx.fill();
+
+  // Windshield
+  ctx.fillStyle = 'rgba(100,200,255,0.65)';
+  ctx.beginPath();
+  ctx.moveTo(-16, -bh/2 + 2);
+  ctx.lineTo(16, -bh/2 + 2);
+  ctx.lineTo(13, -bh/2 + 30);
+  ctx.lineTo(-13, -bh/2 + 30);
+  ctx.closePath();
+  ctx.fill();
+
+  // Purple hood stripe
+  ctx.strokeStyle = '#6c00ff';
+  ctx.lineWidth   = 3;
+  ctx.beginPath();
+  ctx.moveTo(0, -bh/2 + 30);
+  ctx.lineTo(0, bh/2 - 5);
+  ctx.stroke();
+
+  // Wheels
+  ctx.fillStyle = '#1a1a2e';
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 2;
+  [[-bw/2 - 8, -bh/2 + 10], [bw/2 - 4, -bh/2 + 10],
+   [-bw/2 - 8,  bh/2 - 28], [bw/2 - 4,  bh/2 - 28]].forEach(([wx, wy]) => {
+    ctx.fillRect(wx, wy, 12, 18);
+    ctx.strokeRect(wx, wy, 12, 18);
+  });
+
+  // Headlight cones at night
+  if (game.nightProgress > 0.2) {
+    const coneAlpha = game.nightProgress * 0.3;
+    [-16, 16].forEach(hx => {
+      const cg = ctx.createRadialGradient(hx, -bh/2, 0, hx, -bh/2 - 60, 50);
+      cg.addColorStop(0, `rgba(255,255,180,${coneAlpha})`);
+      cg.addColorStop(1, `rgba(255,255,180,0)`);
+      ctx.fillStyle = cg;
+      ctx.beginPath();
+      ctx.moveTo(hx, -bh/2);
+      ctx.lineTo(hx - 25, -bh/2 - 80);
+      ctx.lineTo(hx + 25, -bh/2 - 80);
+      ctx.closePath();
+      ctx.fill();
+    });
+  }
+
+  ctx.restore();
+
+  // Nitro flame particles
+  game.nitroParticles.forEach(p => {
+    const alpha = p.life / p.maxLife;
+    const r = 4 + (1 - alpha) * 6;
+    const col = alpha > 0.5
+      ? `rgba(255,180,0,${alpha})`
+      : `rgba(255,80,0,${alpha})`;
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Nitro flame behind car
+  if (game.nitroActive) {
+    for (let f = 0; f < 3; f++) {
+      const ft = (game.t * 15 + f * 2) % (Math.PI * 2);
+      const fy = H - 55 + Math.sin(ft) * 5;
+      const fw = 16 - f * 4;
+      const fh = 20 + Math.sin(ft * 2) * 8;
+      const fg = ctx.createLinearGradient(player.x, fy, player.x, fy + fh);
+      fg.addColorStop(0, 'rgba(255,180,0,0.95)');
+      fg.addColorStop(1, 'rgba(255,60,0,0)');
+      ctx.fillStyle = fg;
+      ctx.fillRect(player.x - fw/2, fy, fw, fh);
+    }
+  }
+}
+
+function drawHUD() {
+  // ── Speedometer arc ──
+  const cx = 90, cy = H - 55, r = 48;
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+  ctx.lineWidth   = 8;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, Math.PI * 0.75, Math.PI * 2.25);
+  ctx.stroke();
+
+  const speedRatio = game.speed / 260;
+  const speedColor = game.nitroActive ? '#ff7800' : '#00b4ff';
+  ctx.strokeStyle = speedColor;
+  ctx.lineWidth   = 8;
+  ctx.lineCap     = 'round';
+  ctx.shadowBlur  = 12;
+  ctx.shadowColor = speedColor;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, Math.PI * 0.75, Math.PI * 0.75 + Math.PI * 1.5 * speedRatio);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.lineCap    = 'butt';
+
+  ctx.fillStyle  = '#e8e8f0';
+  ctx.font       = 'bold 16px Arial';
+  ctx.textAlign  = 'center';
+  ctx.fillText(Math.floor(game.speed), cx, cy + 6);
+  ctx.font       = '10px Arial';
+  ctx.fillStyle  = '#aaa';
+  ctx.fillText('km/h', cx, cy + 18);
+
+  // ── Distance & score ──
+  ctx.textAlign  = 'left';
+  ctx.fillStyle  = '#e8e8f0';
+  ctx.font       = 'bold 20px Arial';
+  ctx.fillText(`${Math.floor(game.distance)}m`, W/2 - 60, 32);
+  ctx.font       = '13px Arial';
+  ctx.fillStyle  = '#aaa';
+  ctx.fillText(`SCORE: ${game.score.toLocaleString()}`, W/2 - 60, 52);
+  ctx.fillStyle  = '#6c00ff';
+  ctx.fillText(`×${game.multiplier.toFixed(1)}`, W/2 + 50, 32);
+
+  // ── Lives ──
+  for (let i = 0; i < 3; i++) {
+    drawCarIcon(W - 110 + i * 34, 20, i < game.lives);
+  }
+
+  // ── Nitro bar ──
+  const nw = 100, nh = 10;
+  const nx = W/2 - nw/2, ny = H - 20;
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(nx, ny, nw, nh);
+
+  let nitroFill = 0;
+  if (game.nitroActive) {
+    nitroFill = game.nitroDuration / 3;
+  } else if (game.nitroCooldown <= 0) {
+    nitroFill = 1;
+  } else {
+    nitroFill = 1 - game.nitroCooldown / 10;
+  }
+  const nitroColor = game.nitroActive ? '#ff7800' : '#6c00ff';
+  ctx.fillStyle   = nitroColor;
+  ctx.fillRect(nx, ny, nw * nitroFill, nh);
+  ctx.strokeStyle = '#555';
+  ctx.lineWidth   = 1;
+  ctx.strokeRect(nx, ny, nw, nh);
+
+  ctx.fillStyle  = '#e8e8f0';
+  ctx.font       = '10px Arial';
+  ctx.textAlign  = 'center';
+  ctx.fillText('NITRO', W/2, ny - 2);
+
+  // ── Fanfare ──
+  if (game.fanfareTimer > 0) {
+    const alpha = Math.min(1, game.fanfareTimer);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle   = '#f0d060';
+    ctx.font        = 'bold 48px Arial';
+    ctx.textAlign   = 'center';
+    ctx.shadowBlur  = 20;
+    ctx.shadowColor = '#ff8800';
+    ctx.fillText(game.fanfareText, W/2, H/2 - 30);
+    ctx.shadowBlur  = 0;
+    ctx.restore();
+  }
+
+  // ── Combo ──
+  if (game.comboTimer > 0) {
+    const alpha = Math.min(1, game.comboTimer);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle   = '#00b4ff';
+    ctx.font        = 'bold 32px Arial';
+    ctx.textAlign   = 'center';
+    ctx.shadowBlur  = 15;
+    ctx.shadowColor = '#6c00ff';
+    ctx.fillText(game.comboText, W/2, 120);
+    ctx.shadowBlur  = 0;
+    ctx.restore();
+  }
+}
+
+function drawCarIcon(x, y, alive) {
+  ctx.fillStyle = alive ? '#00b4ff' : '#333';
+  ctx.fillRect(x,     y + 4,  20, 14);
+  ctx.fillStyle = alive ? '#6c00ff' : '#222';
+  ctx.fillRect(x + 3, y,      14, 8);
+  ctx.fillStyle = '#111';
+  ctx.fillRect(x,     y + 14, 6, 4);
+  ctx.fillRect(x+14,  y + 14, 6, 4);
+}
+
+function drawStartScreen() {
+  // Background
+  drawSky();
+  drawGrass();
+  drawRoad();
+
+  // Overlay
+  ctx.fillStyle = 'rgba(10,10,15,0.6)';
+  ctx.fillRect(0, 0, W, H);
+
+  // Animated car zooming in
+  const sc = 0.4 + 0.3 * Math.sin(Date.now() / 600);
+  ctx.save();
+  ctx.translate(W/2, H * 0.55);
+  ctx.scale(sc, sc);
+  // Simple car shape
+  ctx.fillStyle = '#00b4ff';
+  ctx.fillRect(-30, -50, 60, 90);
+  ctx.fillStyle = '#6c00ff';
+  ctx.fillRect(-18, -50, 36, 30);
+  ctx.restore();
+
+  ctx.textAlign  = 'center';
+  ctx.fillStyle  = '#6c00ff';
+  ctx.font       = 'bold 56px Arial';
+  ctx.shadowBlur = 30;
+  ctx.shadowColor = '#6c00ff';
+  ctx.fillText('STREET', W/2, 110);
+  ctx.fillStyle   = '#00b4ff';
+  ctx.shadowColor = '#00b4ff';
+  ctx.fillText('RACING', W/2, 170);
+  ctx.shadowBlur  = 0;
+
+  ctx.fillStyle = '#e8e8f0';
+  ctx.font      = '18px Arial';
+  ctx.fillText('Press ENTER or tap to start', W/2, 220);
+
+  ctx.font      = '13px Arial';
+  ctx.fillStyle = '#888';
+  ctx.fillText('← → Steer  |  SPACE/N = Nitro  |  Best: ' + bestDist + 'm', W/2, H - 20);
+}
+
+function drawGameOverScreen() {
+  ctx.fillStyle = 'rgba(10,10,15,0.85)';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.textAlign  = 'center';
+  ctx.fillStyle  = '#e8e8f0';
+  ctx.font       = 'bold 54px Arial';
+  ctx.shadowBlur = 20;
+  ctx.shadowColor = '#6c00ff';
+  ctx.fillText('GAME OVER', W/2, 130);
+  ctx.shadowBlur = 0;
+
+  ctx.font = '24px Arial';
+  ctx.fillText(`Distance: ${Math.floor(game.distance)}m`, W/2, 190);
+  ctx.fillText(`Score: ${game.score.toLocaleString()}`, W/2, 220);
+
+  ctx.fillStyle = '#f0d060';
+  ctx.fillText(`Best: ${bestDist}m`, W/2, 255);
+
+  // Restart button
+  const bx = W/2 - 100, by = 290, bw = 200, bh = 50;
+  ctx.fillStyle = '#6c00ff';
+  ctx.fillRect(bx, by, bw, bh);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 22px Arial';
+  ctx.fillText('RESTART', W/2, by + 33);
+
+  ctx.fillStyle = '#888';
+  ctx.font = '13px Arial';
+  ctx.fillText('← → Steer  |  SPACE = Nitro', W/2, H - 20);
+}
+
+// ─── MAIN LOOP ─────────────────────────────────────────────────────────────
+let lastTime = 0;
+
+function loop(ts) {
+  const dt = Math.min((ts - lastTime) / 1000, 0.05);
+  lastTime = ts;
+
+  ctx.clearRect(0, 0, W, H);
+
+  if (state === 'start') {
+    // animate the start screen road too
+    game.t += dt * 0.5;
+    game.curveSeed += dt * 0.1;
+    game.curveAmt   = Math.sin(game.curveSeed) * 40;
+    game.cameraX    = game.curveAmt;
+    drawStartScreen();
+  } else if (state === 'play') {
+    update(dt);
+
+    // Camera shake
+    const sx = game.shake > 0 ? (Math.random() - 0.5) * 8 * game.shake : 0;
+    const sy = game.shake > 0 ? (Math.random() - 0.5) * 8 * game.shake : 0;
+    ctx.save();
+    ctx.translate(sx, sy);
+
+    drawSky();
+    drawGrass();
+    drawRoad();
+    drawTrees();
+
+    // Traffic (sorted far→near)
+    trafficCars.slice().sort((a, b) => a.z - b.z).forEach(drawTrafficCar);
+
+    drawPlayerCar();
+
+    ctx.restore();
+
+    // Flash overlay
+    if (game.flashAlpha > 0) {
+      ctx.fillStyle = `rgba(255,80,0,${game.flashAlpha})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    drawHUD();
+  } else if (state === 'gameover') {
+    drawSky();
+    drawGrass();
+    drawRoad();
+    drawGameOverScreen();
+  }
+
+  raf = requestAnimationFrame(loop);
+}
+
+// ─── HELPERS ───────────────────────────────────────────────────────────────
+function lerpColor(a, b, t) {
+  t = Math.max(0, Math.min(1, t));
+  const pa = hexToRgb(a), pb = hexToRgb(b);
+  return `rgb(${Math.round(pa[0]+(pb[0]-pa[0])*t)},${Math.round(pa[1]+(pb[1]-pa[1])*t)},${Math.round(pa[2]+(pb[2]-pa[2])*t)})`;
+}
+function hexToRgb(h) {
+  const v = parseInt(h.replace('#',''), 16);
+  return [(v>>16)&255,(v>>8)&255,v&255];
+}
+function hashRand(i, j) {
+  // Deterministic pseudo-random from indices
+  const s = Math.sin(i * 127.1 + j * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+// Canvas click for restart
+canvas.addEventListener('click', e => {
+  if (state === 'gameover') {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = W / rect.width;
+    const scaleY = H / rect.height;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top)  * scaleY;
+    if (mx > W/2-100 && mx < W/2+100 && my > 290 && my < 340) startGame();
+  }
+});
+
+// Start the loop
+requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>

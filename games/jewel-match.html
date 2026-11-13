@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Jewel Match</title>
+<style>
+/* ============================================================
+   BASE & RESET
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0a0a0f;
+  --text:      #e8e8f0;
+  --purple:    #6c00ff;
+  --blue:      #00b4ff;
+  --cell:      62px;
+  --gap:       3px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ============================================================
+   SCREENS
+   ============================================================ */
+.screen { display: none; width: 100%; max-width: 560px; padding: 12px; }
+.screen.active { display: flex; flex-direction: column; align-items: center; }
+
+/* ============================================================
+   MENU SCREEN
+   ============================================================ */
+#menu-screen h1 {
+  font-size: clamp(2rem, 7vw, 3.4rem);
+  font-weight: 900;
+  letter-spacing: 2px;
+  background: linear-gradient(135deg, #ff66cc, var(--purple), var(--blue), #00ffcc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: none;
+  margin-bottom: 8px;
+  text-align: center;
+}
+#menu-screen p.tagline {
+  color: #888;
+  font-size: .9rem;
+  margin-bottom: 24px;
+}
+
+/* Spinning jewel orbs on menu */
+.orbs-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.menu-orb {
+  width: 44px; height: 44px;
+  border-radius: 10px;
+  animation: spinOrb 3s linear infinite;
+  box-shadow: 0 0 14px currentColor;
+}
+.menu-orb:nth-child(1) { background: radial-gradient(circle at 30% 30%, #ff9999, #cc0000); color: #cc0000; animation-delay: 0s; }
+.menu-orb:nth-child(2) { background: radial-gradient(circle at 30% 30%, #9999ff, #0000cc); color: #0000cc; animation-delay: -.43s; }
+.menu-orb:nth-child(3) { background: radial-gradient(circle at 30% 30%, #99ff99, #00aa00); color: #00aa00; animation-delay: -.86s; }
+.menu-orb:nth-child(4) { background: radial-gradient(circle at 30% 30%, #ffff99, #ccaa00); color: #ccaa00; animation-delay: -1.3s; }
+.menu-orb:nth-child(5) { background: radial-gradient(circle at 30% 30%, #dd99ff, #8800cc); color: #8800cc; animation-delay: -1.72s; }
+.menu-orb:nth-child(6) { background: radial-gradient(circle at 30% 30%, #ffffff, #aaccff); color: #aaccff; animation-delay: -2.15s; }
+.menu-orb:nth-child(7) { background: radial-gradient(circle at 30% 30%, #666666, #111111); color: #666666; animation-delay: -2.58s; }
+
+@keyframes spinOrb {
+  0%   { transform: rotateY(0deg) scale(1); }
+  25%  { transform: rotateY(90deg) scale(1.1); }
+  50%  { transform: rotateY(180deg) scale(1); }
+  75%  { transform: rotateY(270deg) scale(1.1); }
+  100% { transform: rotateY(360deg) scale(1); }
+}
+
+/* Buttons */
+.btn {
+  padding: 12px 32px;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+  letter-spacing: 1px;
+}
+.btn:active { transform: scale(.96); }
+.btn-primary {
+  background: linear-gradient(135deg, var(--purple), var(--blue));
+  color: #fff;
+  box-shadow: 0 0 20px rgba(108,0,255,.5);
+}
+.btn-primary:hover { box-shadow: 0 0 30px rgba(108,0,255,.8); transform: translateY(-2px); }
+.btn-secondary {
+  background: rgba(255,255,255,.08);
+  color: var(--text);
+  border: 1px solid rgba(255,255,255,.15);
+}
+.btn-secondary:hover { background: rgba(255,255,255,.14); }
+
+/* Level selector grid */
+#level-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin: 20px 0;
+  width: 100%;
+  max-width: 340px;
+}
+.lvl-btn {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  font-weight: 700;
+  font-size: .85rem;
+  cursor: pointer;
+  transition: transform .15s;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px;
+}
+.lvl-btn.unlocked {
+  background: rgba(108,0,255,.2);
+  border-color: var(--purple);
+  color: var(--text);
+}
+.lvl-btn.unlocked:hover { transform: scale(1.1); background: rgba(108,0,255,.4); }
+.lvl-btn.locked {
+  background: rgba(255,255,255,.04);
+  border-color: rgba(255,255,255,.1);
+  color: #444;
+  cursor: not-allowed;
+}
+.lvl-btn .stars { font-size: .6rem; }
+
+/* ============================================================
+   GAME SCREEN
+   ============================================================ */
+#game-screen { gap: 8px; }
+
+/* HUD */
+#hud {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 6px;
+  padding: 6px 0;
+}
+.hud-box {
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 8px;
+  padding: 6px 8px;
+  text-align: center;
+}
+.hud-label { font-size: .6rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+.hud-value { font-size: 1.1rem; font-weight: 700; color: var(--blue); }
+.hud-value.warning { color: #ff4444; }
+
+/* Target progress bar */
+#progress-bar-wrap {
+  width: 100%;
+  height: 8px;
+  background: rgba(255,255,255,.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+#progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--purple), var(--blue));
+  border-radius: 4px;
+  transition: width .3s;
+  width: 0%;
+}
+
+/* Objective banner */
+#objective-banner {
+  font-size: .78rem;
+  color: #ffcc44;
+  text-align: center;
+  min-height: 1.2em;
+}
+
+/* Power-up row */
+#powerup-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.pu-btn {
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: .82rem;
+  cursor: pointer;
+  color: var(--text);
+  transition: background .15s;
+}
+.pu-btn:hover { background: rgba(108,0,255,.3); }
+.pu-btn .cost { color: #ffcc44; font-size: .7rem; }
+.pu-btn.active-pu { border-color: var(--blue); background: rgba(0,180,255,.2); }
+
+/* Grid container */
+#grid-wrap {
+  position: relative;
+  display: grid;
+  gap: var(--gap);
+}
+
+/* Individual gem cells */
+.gem {
+  width: var(--cell);
+  height: var(--cell);
+  border-radius: 10px;
+  position: relative;
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease, opacity .3s ease;
+  transform-origin: center;
+  overflow: hidden;
+}
+
+/* Shine pseudo-element */
+.gem::before {
+  content: '';
+  position: absolute;
+  top: 5px; left: 6px;
+  width: 40%; height: 35%;
+  background: radial-gradient(ellipse at 40% 40%, rgba(255,255,255,.75), transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Gem types */
+.gem[data-type="0"] { background: radial-gradient(circle at 30% 30%, #ff9999, #cc0000); box-shadow: 0 0 8px #cc0000; }
+.gem[data-type="1"] { background: radial-gradient(circle at 30% 30%, #9999ff, #0000cc); box-shadow: 0 0 8px #3333cc; }
+.gem[data-type="2"] { background: radial-gradient(circle at 30% 30%, #99ff99, #00aa00); box-shadow: 0 0 8px #00aa00; }
+.gem[data-type="3"] { background: radial-gradient(circle at 30% 30%, #ffff99, #ccaa00); box-shadow: 0 0 8px #ccaa00; }
+.gem[data-type="4"] { background: radial-gradient(circle at 30% 30%, #dd99ff, #8800cc); box-shadow: 0 0 8px #8800cc; }
+.gem[data-type="5"] { background: radial-gradient(circle at 30% 30%, #ffffff, #aaccff); box-shadow: 0 0 8px #aaccff; }
+.gem[data-type="6"] { background: radial-gradient(circle at 30% 30%, #666666, #111111); box-shadow: 0 0 8px #444444; }
+
+/* Special gems */
+.gem[data-special="line"] {
+  box-shadow: 0 0 16px #ffff00, 0 0 4px #ffff00 inset;
+  border: 2px solid #ffff00;
+}
+.gem[data-special="line"]::after {
+  content: '⚡';
+  position: absolute;
+  inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.5rem;
+  z-index: 3;
+}
+.gem[data-special="bomb"] {
+  box-shadow: 0 0 16px #ff6600, 0 0 4px #ff6600 inset;
+  border: 2px solid #ff6600;
+}
+.gem[data-special="bomb"]::after {
+  content: '💣';
+  position: absolute;
+  inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem;
+  z-index: 3;
+}
+.gem[data-special="colorbomb"] {
+  background: conic-gradient(#ff0000,#ffaa00,#ffff00,#00ff00,#00aaff,#aa00ff,#ff0000) !important;
+  box-shadow: 0 0 20px #ffffff;
+  animation: rainbowSpin 2s linear infinite;
+  border: 2px solid #fff;
+}
+.gem[data-special="colorbomb"]::after {
+  content: '🌈';
+  position: absolute;
+  inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem;
+  z-index: 3;
+}
+@keyframes rainbowSpin {
+  from { filter: hue-rotate(0deg); }
+  to   { filter: hue-rotate(360deg); }
+}
+
+/* Selected gem */
+.gem.selected {
+  transform: scale(1.12) !important;
+  box-shadow: 0 0 0 3px #fff, 0 0 20px #fff !important;
+  animation: pulseSelect 0.7s ease-in-out infinite alternate;
+  z-index: 10;
+}
+@keyframes pulseSelect {
+  from { box-shadow: 0 0 0 3px #fff, 0 0 15px #fff; }
+  to   { box-shadow: 0 0 0 3px var(--blue), 0 0 30px var(--blue); }
+}
+
+/* Matched → disappear */
+.gem.matched {
+  transform: scale(0) !important;
+  opacity: 0 !important;
+  transition: transform .3s ease, opacity .3s ease !important;
+}
+
+/* Falling from top */
+.gem.falling {
+  animation: gemFall .22s cubic-bezier(.22,.61,.36,1) forwards;
+}
+@keyframes gemFall {
+  from { transform: translateY(-40px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+/* Swap bounce-back */
+.gem.swap-fail {
+  animation: swapFail .25s ease both;
+}
+@keyframes swapFail {
+  0%  { transform: translateX(0); }
+  40% { transform: translateX(var(--dx,6px)) translateY(var(--dy,0px)); }
+  100%{ transform: translateX(0); }
+}
+
+/* Score pop */
+.score-pop {
+  position: absolute;
+  pointer-events: none;
+  font-weight: 700;
+  color: #ffdd44;
+  font-size: 1rem;
+  animation: scorePop .9s ease forwards;
+  z-index: 100;
+  white-space: nowrap;
+  text-shadow: 0 0 8px rgba(255,200,0,.8);
+}
+@keyframes scorePop {
+  0%  { opacity: 1; transform: translateY(0) scale(1); }
+  60% { opacity: 1; transform: translateY(-36px) scale(1.2); }
+  100%{ opacity: 0; transform: translateY(-64px) scale(.8); }
+}
+
+/* Combo banner */
+.combo-banner {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 2rem;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 0 24px var(--purple);
+  animation: comboBanner .9s ease forwards;
+  pointer-events: none;
+  z-index: 200;
+  white-space: nowrap;
+}
+@keyframes comboBanner {
+  0%  { opacity: 0; transform: translate(-50%,-50%) scale(.4); }
+  25% { opacity: 1; transform: translate(-50%,-50%) scale(1.2); }
+  70% { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+  100%{ opacity: 0; transform: translate(-50%,-50%) scale(1); }
+}
+
+/* ============================================================
+   LEVEL COMPLETE / GAME OVER OVERLAYS
+   ============================================================ */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10,10,15,.88);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  backdrop-filter: blur(4px);
+}
+.overlay.show { display: flex; }
+.overlay-box {
+  background: linear-gradient(145deg, #12121e, #0a0a1a);
+  border: 1px solid rgba(108,0,255,.4);
+  border-radius: 16px;
+  padding: 36px 40px;
+  text-align: center;
+  max-width: 340px;
+  width: 90%;
+  animation: popIn .4s cubic-bezier(.22,.61,.36,1);
+}
+@keyframes popIn {
+  from { transform: scale(.6); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+.overlay-box h2 { font-size: 2rem; margin-bottom: 8px; }
+.overlay-box .stars { font-size: 2.4rem; letter-spacing: 4px; margin: 12px 0; }
+.overlay-box .stat-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: .9rem; color: #aaa; }
+.overlay-box .stat-row span:last-child { color: var(--text); font-weight: 600; }
+.overlay-box .btn-row { display: flex; gap: 10px; justify-content: center; margin-top: 20px; }
+
+/* Shimmer for level complete */
+.shimmer-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,.12) 50%, transparent 60%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 16px;
+  pointer-events: none;
+}
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+/* ============================================================
+   LEADERBOARD
+   ============================================================ */
+#lb-screen table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .85rem;
+  margin-top: 12px;
+}
+#lb-screen th, #lb-screen td {
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+}
+#lb-screen th { color: #888; font-weight: 500; }
+
+/* ============================================================
+   RESPONSIVE SCALING
+   ============================================================ */
+@media (max-width: 540px) {
+  :root { --cell: 40px; --gap: 2px; }
+  #hud { grid-template-columns: 1fr 1fr; }
+  .pu-btn { padding: 5px 8px; font-size: .7rem; }
+}
+@media (max-width: 360px) {
+  :root { --cell: 36px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     MENU SCREEN
+     ============================================================ -->
+<div id="menu-screen" class="screen active">
+  <h1>💎 Jewel Match</h1>
+  <p class="tagline">Match gems — unleash power!</p>
+  <div class="orbs-row">
+    <div class="menu-orb"></div>
+    <div class="menu-orb"></div>
+    <div class="menu-orb"></div>
+    <div class="menu-orb"></div>
+    <div class="menu-orb"></div>
+    <div class="menu-orb"></div>
+    <div class="menu-orb"></div>
+  </div>
+  <div style="display:flex;gap:12px;margin-bottom:20px;">
+    <button class="btn btn-primary" id="btn-play">▶ Play</button>
+    <button class="btn btn-secondary" id="btn-lb">🏆 Scores</button>
+  </div>
+  <div id="level-grid"></div>
+</div>
+
+<!-- ============================================================
+     GAME SCREEN
+     ============================================================ -->
+<div id="game-screen" class="screen">
+  <!-- HUD top row -->
+  <div id="hud">
+    <div class="hud-box">
+      <div class="hud-label">Level</div>
+      <div class="hud-value" id="hud-level">1</div>
+    </div>
+    <div class="hud-box">
+      <div class="hud-label">Score</div>
+      <div class="hud-value" id="hud-score">0</div>
+    </div>
+    <div class="hud-box">
+      <div class="hud-label">Target</div>
+      <div class="hud-value" id="hud-target">500</div>
+    </div>
+    <div class="hud-box">
+      <div class="hud-label">Moves</div>
+      <div class="hud-value" id="hud-moves">25</div>
+    </div>
+  </div>
+
+  <!-- Progress bar -->
+  <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
+
+  <!-- Objective text -->
+  <div id="objective-banner"></div>
+
+  <!-- Power-up row -->
+  <div id="powerup-row">
+    <button class="pu-btn" data-pu="hammer" title="Remove any gem">🔨 <span>Hammer</span> <span class="cost">-100</span></button>
+    <button class="pu-btn" data-pu="shuffle" title="Shuffle board">🔀 <span>Shuffle</span> <span class="cost">-200</span></button>
+    <button class="pu-btn" data-pu="colorburst" title="Clear a color">💥 <span>Burst</span> <span class="cost">-300</span></button>
+  </div>
+
+  <!-- The 8×8 grid -->
+  <div id="grid-wrap"></div>
+
+  <button class="btn btn-secondary" id="btn-menu" style="margin-top:8px;padding:8px 20px;font-size:.8rem;">← Menu</button>
+</div>
+
+<!-- ============================================================
+     LEADERBOARD SCREEN
+     ============================================================ -->
+<div id="lb-screen" class="screen">
+  <h2 style="margin-bottom:12px;">🏆 Leaderboard</h2>
+  <table>
+    <thead><tr><th>Level</th><th>Score</th><th>Stars</th></tr></thead>
+    <tbody id="lb-body"></tbody>
+  </table>
+  <button class="btn btn-secondary" style="margin-top:20px;" id="btn-lb-back">← Back</button>
+</div>
+
+<!-- ============================================================
+     LEVEL COMPLETE OVERLAY
+     ============================================================ -->
+<div class="overlay" id="lvl-overlay">
+  <div class="overlay-box" style="position:relative;overflow:hidden;">
+    <div class="shimmer-overlay"></div>
+    <h2 style="color:#ffdd44;">✨ Level Complete!</h2>
+    <div class="stars" id="ov-stars">⭐⭐⭐</div>
+    <div class="stat-row"><span>Score</span><span id="ov-score">0</span></div>
+    <div class="stat-row"><span>Target</span><span id="ov-target">0</span></div>
+    <div class="stat-row"><span>Moves Left</span><span id="ov-moves">0</span></div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="btn-retry">↩ Retry</button>
+      <button class="btn btn-primary"   id="btn-next">Next ▶</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     GAME OVER OVERLAY
+     ============================================================ -->
+<div class="overlay" id="over-overlay">
+  <div class="overlay-box">
+    <h2 style="color:#ff4444;">💔 Game Over</h2>
+    <p style="color:#888;margin:8px 0 16px;">Target not reached</p>
+    <div class="stat-row"><span>Your Score</span><span id="ov-over-score">0</span></div>
+    <div class="stat-row"><span>Target Was</span><span id="ov-over-target">0</span></div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="btn-over-menu">← Menu</button>
+      <button class="btn btn-primary"   id="btn-over-retry">↩ Retry</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   CONSTANTS & CONFIG
+   ============================================================ */
+const COLS = 8, ROWS = 8;
+const TYPES = 7;             // gem color count
+const LEVEL_COUNT = 20;
+const STORAGE_KEY = 'jm_progress';
+
+// Level definitions
+function getLevelConfig(lvl) {
+  return {
+    target:    500 + (lvl - 1) * 300,
+    moves:     Math.max(15, 25 - Math.floor((lvl - 1) / 2)),
+    objective: lvl >= 5 ? getObjective(lvl) : null,
+  };
+}
+function getObjective(lvl) {
+  const objectives = [
+    { text: 'Clear 10 red gems', type: 'clear_color', color: 0, count: 10 },
+    { text: 'Make 3 chain combos', type: 'chain', count: 3 },
+    { text: 'Clear 8 blue gems',   type: 'clear_color', color: 1, count: 8 },
+    { text: 'Score 5 4-matches',   type: 'four_match', count: 5 },
+    { text: 'Clear 10 green gems', type: 'clear_color', color: 2, count: 10 },
+    { text: 'Make 5 chain combos', type: 'chain', count: 5 },
+    { text: 'Clear 12 yellow gems',type: 'clear_color', color: 3, count: 12 },
+    { text: 'Score 3 bomb matches',type: 'bomb_match', count: 3 },
+    { text: 'Clear 10 purple gems',type: 'clear_color', color: 4, count: 10 },
+    { text: 'Make 7 chain combos', type: 'chain', count: 7 },
+    { text: 'Clear 10 white gems', type: 'clear_color', color: 5, count: 10 },
+    { text: 'Make 3 color bombs',  type: 'color_bomb', count: 3 },
+    { text: 'Clear 12 black gems', type: 'clear_color', color: 6, count: 12 },
+    { text: 'Make 10 chain combos',type: 'chain', count: 10 },
+    { text: 'Score 5 4-matches',   type: 'four_match', count: 5 },
+    { text: 'Clear 15 red gems',   type: 'clear_color', color: 0, count: 15 },
+  ][(lvl - 5) % 16];
+  return objectives;
+}
+
+/* ============================================================
+   GAME STATE
+   ============================================================ */
+let state = {
+  level: 1,
+  score: 0,
+  moves: 0,
+  target: 0,
+  board: [],       // [row][col] = { type, special, el }
+  selected: null,  // { r, c }
+  busy: false,
+  activePU: null,  // 'hammer' | 'colorburst'
+  objective: null,
+  objProgress: 0,
+  chainCount: 0,
+};
+
+// Save/load
+function saveProgress(lvl, score, stars) {
+  let data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  if (!data[lvl] || score > data[lvl].score) {
+    data[lvl] = { score, stars };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  }
+}
+function loadProgress() {
+  return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+}
+
+/* ============================================================
+   BOARD CREATION
+   ============================================================ */
+function randomType() { return Math.floor(Math.random() * TYPES); }
+
+function createBoard() {
+  state.board = [];
+  for (let r = 0; r < ROWS; r++) {
+    state.board[r] = [];
+    for (let c = 0; c < COLS; c++) {
+      let t;
+      // Avoid placing initial matches
+      do {
+        t = randomType();
+      } while (
+        (c >= 2 && state.board[r][c-1].type === t && state.board[r][c-2].type === t) ||
+        (r >= 2 && state.board[r-1][c].type === t && state.board[r-2][c].type === t)
+      );
+      state.board[r][c] = { type: t, special: null, el: null };
+    }
+  }
+}
+
+/* ============================================================
+   DOM RENDERING
+   ============================================================ */
+function renderGrid() {
+  const wrap = document.getElementById('grid-wrap');
+  wrap.innerHTML = '';
+  const cellPx = getComputedStyle(document.documentElement).getPropertyValue('--cell').trim();
+  const gapPx  = getComputedStyle(document.documentElement).getPropertyValue('--gap').trim();
+  wrap.style.gridTemplateColumns = `repeat(${COLS}, ${cellPx})`;
+  wrap.style.gridTemplateRows    = `repeat(${ROWS}, ${cellPx})`;
+  wrap.style.gap = gapPx;
+
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const gem = createGemEl(r, c);
+      wrap.appendChild(gem);
+      state.board[r][c].el = gem;
+    }
+  }
+}
+
+function createGemEl(r, c) {
+  const cell = state.board[r][c];
+  const el = document.createElement('div');
+  el.className = 'gem';
+  el.dataset.r = r;
+  el.dataset.c = c;
+  el.dataset.type = cell.type;
+  if (cell.special) el.dataset.special = cell.special;
+  el.addEventListener('pointerdown', onGemClick);
+  return el;
+}
+
+function syncGemEl(r, c) {
+  const cell = state.board[r][c];
+  const el = cell.el;
+  if (!el) return;
+  el.dataset.r    = r;
+  el.dataset.c    = c;
+  el.dataset.type = cell.type;
+  if (cell.special) el.dataset.special = cell.special;
+  else delete el.dataset.special;
+}
+
+/* ============================================================
+   INTERACTION
+   ============================================================ */
+function onGemClick(e) {
+  e.preventDefault();
+  if (state.busy) return;
+  const r = +e.currentTarget.dataset.r;
+  const c = +e.currentTarget.dataset.c;
+
+  // Power-up: hammer
+  if (state.activePU === 'hammer') {
+    deductScore(100);
+    clearPowerup();
+    removeGemAt(r, c, true);
+    afterClear();
+    return;
+  }
+  // Power-up: colorburst
+  if (state.activePU === 'colorburst') {
+    clearPowerup();
+    const t = state.board[r][c].type;
+    deductScore(300);
+    colorBurstClear(t);
+    return;
+  }
+
+  if (!state.selected) {
+    // Select gem
+    state.selected = { r, c };
+    e.currentTarget.classList.add('selected');
+  } else {
+    const { r: sr, c: sc } = state.selected;
+    // Deselect previously selected gem
+    if (state.board[sr][sc].el) state.board[sr][sc].el.classList.remove('selected');
+
+    if (sr === r && sc === c) {
+      // Same gem: deselect
+      state.selected = null;
+      return;
+    }
+    // Check adjacency
+    if (Math.abs(sr - r) + Math.abs(sc - c) === 1) {
+      state.selected = null;
+      doSwap(sr, sc, r, c);
+    } else {
+      // Select new gem instead
+      state.selected = { r, c };
+      e.currentTarget.classList.add('selected');
+    }
+  }
+}
+
+/* ============================================================
+   SWAP LOGIC
+   ============================================================ */
+async function doSwap(r1, c1, r2, c2) {
+  state.busy = true;
+  swapCells(r1, c1, r2, c2);
+  syncGemEl(r1, c1); syncGemEl(r2, c2);
+
+  // Check for matches
+  const matches = findAllMatches();
+  if (matches.length === 0) {
+    // No match: swap back
+    await delay(180);
+    swapCells(r1, c1, r2, c2);
+    syncGemEl(r1, c1); syncGemEl(r2, c2);
+    // Brief shake animation on both
+    animateSwapFail(r1, c1, r2, c2);
+  } else {
+    // Valid swap: use a move
+    state.moves--;
+    updateHUD();
+    await processMatches(matches, 1);
+  }
+  state.busy = false;
+  checkEndCondition();
+}
+
+function swapCells(r1, c1, r2, c2) {
+  const tmp = state.board[r1][c1];
+  state.board[r1][c1] = state.board[r2][c2];
+  state.board[r2][c2] = tmp;
+  // Also swap DOM elements in grid
+  const el1 = state.board[r1][c1].el;
+  const el2 = state.board[r2][c2].el;
+  const wrap = document.getElementById('grid-wrap');
+  const children = [...wrap.children];
+  const idx1 = r1 * COLS + c1;
+  const idx2 = r2 * COLS + c2;
+  // Swap DOM positions
+  const ph1 = document.createElement('span');
+  el1.replaceWith(ph1);
+  el2.replaceWith(el1);
+  ph1.replaceWith(el2);
+  state.board[r1][c1].el = el1;
+  state.board[r2][c2].el = el2;
+}
+
+function animateSwapFail(r1, c1, r2, c2) {
+  [state.board[r1][c1].el, state.board[r2][c2].el].forEach(el => {
+    el.classList.add('swap-fail');
+    el.addEventListener('animationend', () => el.classList.remove('swap-fail'), { once: true });
+  });
+}
+
+/* ============================================================
+   MATCH DETECTION
+   ============================================================ */
+function findAllMatches() {
+  const matched = new Set(); // "r,c" strings
+  const matchGroups = [];    // arrays of {r,c}
+
+  // Horizontal
+  for (let r = 0; r < ROWS; r++) {
+    let c = 0;
+    while (c < COLS) {
+      const t = state.board[r][c].type;
+      if (t < 0) { c++; continue; }
+      let len = 1;
+      while (c + len < COLS && state.board[r][c + len].type === t) len++;
+      if (len >= 3) {
+        const group = [];
+        for (let i = 0; i < len; i++) group.push({ r, c: c + i });
+        matchGroups.push(group);
+        group.forEach(g => matched.add(`${g.r},${g.c}`));
+      }
+      c += len;
+    }
+  }
+
+  // Vertical
+  for (let c = 0; c < COLS; c++) {
+    let r = 0;
+    while (r < ROWS) {
+      const t = state.board[r][c].type;
+      if (t < 0) { r++; continue; }
+      let len = 1;
+      while (r + len < ROWS && state.board[r + len][c].type === t) len++;
+      if (len >= 3) {
+        const group = [];
+        for (let i = 0; i < len; i++) group.push({ r: r + i, c });
+        matchGroups.push(group);
+        group.forEach(g => matched.add(`${g.r},${g.c}`));
+      }
+      r += len;
+    }
+  }
+
+  // Merge overlapping groups (L/T-shapes)
+  return mergeGroups(matchGroups);
+}
+
+function mergeGroups(groups) {
+  const merged = [];
+  const used = new Array(groups.length).fill(false);
+  for (let i = 0; i < groups.length; i++) {
+    if (used[i]) continue;
+    let g = [...groups[i]];
+    const gSet = new Set(g.map(x => `${x.r},${x.c}`));
+    for (let j = i + 1; j < groups.length; j++) {
+      if (used[j]) continue;
+      const overlap = groups[j].some(x => gSet.has(`${x.r},${x.c}`));
+      if (overlap) {
+        groups[j].forEach(x => { if (!gSet.has(`${x.r},${x.c}`)) { g.push(x); gSet.add(`${x.r},${x.c}`); } });
+        used[j] = true;
+      }
+    }
+    merged.push(g);
+    used[i] = true;
+  }
+  return merged;
+}
+
+/* ============================================================
+   PROCESS MATCHES (cascade)
+   ============================================================ */
+async function processMatches(groups, comboChain) {
+  if (groups.length === 0) return;
+
+  let totalScore = 0;
+  const toClear = [];
+
+  groups.forEach(group => {
+    const size = group.size !== undefined ? group.size : group.length;
+    let pts = 0, special = null, createPos = group[0];
+
+    if (size >= 5) {
+      pts = 300 * comboChain;
+      special = 'colorbomb';
+      createPos = group[Math.floor(group.length / 2)];
+    } else if (size === 4) {
+      pts = 150 * comboChain;
+      special = 'line';
+      createPos = group[Math.floor(group.length / 2)];
+      trackObjective('four_match', 1);
+    } else if (size >= 3) {
+      // Check for L/T (non-linear)
+      const rows = new Set(group.map(g => g.r));
+      const cols = new Set(group.map(g => g.c));
+      if (rows.size > 1 && cols.size > 1) {
+        pts = 500 * comboChain;
+        special = 'bomb';
+        trackObjective('bomb_match', 1);
+      } else {
+        pts = 50 * comboChain;
+      }
+    }
+
+    toClear.push({ group, pts, special, createPos });
+    totalScore += pts;
+  });
+
+  // Animate matches disappearing
+  toClear.forEach(({ group }) => {
+    group.forEach(({ r, c }) => {
+      const el = state.board[r][c] && state.board[r][c].el;
+      if (el) el.classList.add('matched');
+      // Track objective
+      if (state.objective && state.objective.type === 'clear_color') {
+        const cell = state.board[r][c];
+        if (cell && cell.type === state.objective.color) {
+          trackObjective('clear_color', 1);
+        }
+      }
+    });
+  });
+
+  // Handle special gems in matched area
+  toClear.forEach(({ group }) => {
+    group.forEach(({ r, c }) => {
+      const cell = state.board[r][c];
+      if (cell && cell.special) {
+        activateSpecial(cell.special, r, c, cell.type);
+      }
+    });
+  });
+
+  if (comboChain > 1) {
+    showCombo(comboChain);
+    trackObjective('chain', 1);
+    state.chainCount++;
+  }
+
+  addScore(totalScore);
+  showScorePop(totalScore, comboChain);
+  await delay(320);
+
+  // Remove matched cells from board (set type to -1)
+  toClear.forEach(({ group, special, createPos }) => {
+    group.forEach(({ r, c }) => {
+      state.board[r][c] = { type: -1, special: null, el: state.board[r][c].el };
+    });
+    if (special) {
+      // Place special gem at create position
+      state.board[createPos.r][createPos.c].pendingSpecial = { special, type: state.board[createPos.r][createPos.c].type >= 0 ? state.board[createPos.r][createPos.c].type : 0 };
+    }
+  });
+
+  // Gravity: drop gems down
+  await gravityFill(toClear.flatMap(({ group, special, createPos }) => {
+    if (special) return [{ createPos, special }];
+    return [];
+  }));
+
+  // Check for new matches (cascade)
+  const newMatches = findAllMatches();
+  if (newMatches.length > 0) {
+    await processMatches(newMatches, comboChain + 1);
+  }
+}
+
+function activateSpecial(type, r, c, gemType) {
+  if (type === 'line') {
+    // Clear row + column
+    for (let cc = 0; cc < COLS; cc++) markForRemoval(r, cc);
+    for (let rr = 0; rr < ROWS; rr++) markForRemoval(rr, c);
+  } else if (type === 'bomb') {
+    for (let dr = -1; dr <= 1; dr++)
+      for (let dc = -1; dc <= 1; dc++)
+        markForRemoval(r + dr, c + dc);
+  } else if (type === 'colorbomb') {
+    // Remove all of one color (the type this gem was based on)
+    for (let rr = 0; rr < ROWS; rr++)
+      for (let cc = 0; cc < COLS; cc++)
+        if (state.board[rr][cc].type === gemType) markForRemoval(rr, cc);
+    trackObjective('color_bomb', 1);
+  }
+}
+
+function markForRemoval(r, c) {
+  if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return;
+  const cell = state.board[r][c];
+  if (cell && cell.type >= 0) {
+    if (cell.el) cell.el.classList.add('matched');
+    cell.type = -1;
+  }
+}
+
+/* ============================================================
+   GRAVITY: drop gems and fill from top
+   ============================================================ */
+async function gravityFill(specialPlacements) {
+  const grid = document.getElementById('grid-wrap');
+
+  for (let c = 0; c < COLS; c++) {
+    // Collect non-empty gems from bottom to top
+    const remaining = [];
+    for (let r = ROWS - 1; r >= 0; r--) {
+      if (state.board[r][c].type >= 0) {
+        remaining.push({ ...state.board[r][c] });
+      }
+    }
+
+    // Clear column
+    for (let r = 0; r < ROWS; r++) {
+      const oldEl = state.board[r][c].el;
+      if (oldEl) oldEl.remove();
+      state.board[r][c] = { type: -1, special: null, el: null };
+    }
+
+    // Place remaining gems at bottom
+    let ri = ROWS - 1;
+    for (const cell of remaining) {
+      state.board[ri][c] = { type: cell.type, special: cell.special, el: null };
+      ri--;
+    }
+
+    // Fill top with new gems
+    while (ri >= 0) {
+      const t = randomType();
+      state.board[ri][c] = { type: t, special: null, el: null };
+      ri--;
+    }
+
+    // Rebuild DOM for column
+    for (let r = 0; r < ROWS; r++) {
+      const cell = state.board[r][c];
+      const el = document.createElement('div');
+      el.className = 'gem falling';
+      el.dataset.r = r;
+      el.dataset.c = c;
+      el.dataset.type = cell.type;
+      if (cell.special) el.dataset.special = cell.special;
+      el.addEventListener('pointerdown', onGemClick);
+      // Insert at correct grid position
+      const targetIndex = r * COLS + c;
+      const children = grid.children;
+      if (targetIndex < children.length) {
+        grid.insertBefore(el, children[targetIndex]);
+      } else {
+        grid.appendChild(el);
+      }
+      cell.el = el;
+      el.addEventListener('animationend', () => el.classList.remove('falling'), { once: true });
+    }
+  }
+
+  // Handle special placements
+  specialPlacements.forEach(({ createPos, special }) => {
+    const { r, c } = createPos;
+    // The gem that was created - keep its type, add special
+    if (state.board[r][c] && state.board[r][c].type >= 0) {
+      state.board[r][c].special = special;
+      if (state.board[r][c].el) {
+        state.board[r][c].el.dataset.special = special;
+      }
+    }
+  });
+
+  await delay(250);
+}
+
+/* ============================================================
+   POWER-UP REMOVAL (hammer)
+   ============================================================ */
+function removeGemAt(r, c, spendMove) {
+  const cell = state.board[r][c];
+  if (!cell || cell.type < 0) return;
+  if (cell.el) cell.el.classList.add('matched');
+  cell.type = -1; cell.special = null;
+  if (spendMove) { state.moves--; updateHUD(); }
+}
+
+async function afterClear() {
+  await delay(320);
+  await gravityFill([]);
+  const newMatches = findAllMatches();
+  if (newMatches.length) await processMatches(newMatches, 1);
+  state.busy = false;
+  checkEndCondition();
+}
+
+function colorBurstClear(t) {
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++)
+      if (state.board[r][c].type === t) removeGemAt(r, c, false);
+  state.moves--;
+  updateHUD();
+  afterClear();
+}
+
+/* ============================================================
+   SCORE & OBJECTIVE TRACKING
+   ============================================================ */
+function addScore(pts) {
+  state.score += pts;
+  updateHUD();
+}
+
+function deductScore(pts) {
+  state.score = Math.max(0, state.score - pts);
+  updateHUD();
+}
+
+function trackObjective(type, amount) {
+  if (!state.objective || state.objective.type !== type) return;
+  state.objProgress += amount;
+  updateHUD();
+}
+
+function showScorePop(pts, combo) {
+  if (pts <= 0) return;
+  const wrap = document.getElementById('grid-wrap');
+  const pop = document.createElement('div');
+  pop.className = 'score-pop';
+  pop.textContent = `+${pts}${combo > 1 ? ` ×${combo}` : ''}`;
+  pop.style.left = (20 + Math.random() * 60) + '%';
+  pop.style.top  = (20 + Math.random() * 50) + '%';
+  wrap.appendChild(pop);
+  pop.addEventListener('animationend', () => pop.remove(), { once: true });
+}
+
+function showCombo(n) {
+  const wrap = document.getElementById('grid-wrap');
+  const banner = document.createElement('div');
+  banner.className = 'combo-banner';
+  banner.textContent = `COMBO ×${n}! 🔥`;
+  wrap.appendChild(banner);
+  banner.addEventListener('animationend', () => banner.remove(), { once: true });
+}
+
+/* ============================================================
+   HUD UPDATE
+   ============================================================ */
+function updateHUD() {
+  document.getElementById('hud-level').textContent = state.level;
+  document.getElementById('hud-score').textContent = state.score.toLocaleString();
+  document.getElementById('hud-target').textContent = state.target.toLocaleString();
+  const movesEl = document.getElementById('hud-moves');
+  movesEl.textContent = state.moves;
+  movesEl.className = 'hud-value' + (state.moves <= 5 ? ' warning' : '');
+
+  // Progress bar
+  const pct = Math.min(100, (state.score / state.target) * 100);
+  document.getElementById('progress-bar').style.width = pct + '%';
+
+  // Objective
+  const ob = document.getElementById('objective-banner');
+  if (state.objective) {
+    ob.textContent = `🎯 ${state.objective.text}: ${state.objProgress}/${state.objective.count}`;
+  } else {
+    ob.textContent = '';
+  }
+}
+
+/* ============================================================
+   END CONDITION
+   ============================================================ */
+function checkEndCondition() {
+  if (state.busy) return;
+
+  const objDone = !state.objective ||
+    state.objProgress >= state.objective.count;
+
+  if (state.score >= state.target && objDone) {
+    // Level complete
+    const stars = calcStars();
+    saveProgress(state.level, state.score, stars);
+    showLevelComplete(stars);
+    return;
+  }
+
+  if (state.moves <= 0) {
+    if (state.score >= state.target && objDone) {
+      const stars = calcStars();
+      saveProgress(state.level, state.score, stars);
+      showLevelComplete(stars);
+    } else {
+      showGameOver();
+    }
+  }
+}
+
+function calcStars() {
+  const ratio = state.score / state.target;
+  if (ratio >= 1.5) return 3;
+  if (ratio >= 1.0) return 2;
+  return 1;
+}
+
+function showLevelComplete(stars) {
+  const starStr = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
+  document.getElementById('ov-stars').textContent = starStr;
+  document.getElementById('ov-score').textContent  = state.score.toLocaleString();
+  document.getElementById('ov-target').textContent = state.target.toLocaleString();
+  document.getElementById('ov-moves').textContent  = state.moves;
+  document.getElementById('btn-next').style.display = state.level < LEVEL_COUNT ? '' : 'none';
+  document.getElementById('lvl-overlay').classList.add('show');
+}
+
+function showGameOver() {
+  document.getElementById('ov-over-score').textContent  = state.score.toLocaleString();
+  document.getElementById('ov-over-target').textContent = state.target.toLocaleString();
+  document.getElementById('over-overlay').classList.add('show');
+}
+
+/* ============================================================
+   SHUFFLE
+   ============================================================ */
+function shuffleBoard() {
+  if (state.score < 200) return;
+  deductScore(200);
+  state.moves--;
+  // Collect all current types
+  const types = [];
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++)
+      if (state.board[r][c].type >= 0) types.push(state.board[r][c].type);
+  // Fisher-Yates
+  for (let i = types.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [types[i], types[j]] = [types[j], types[i]];
+  }
+  let idx = 0;
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (state.board[r][c].type >= 0) {
+        state.board[r][c].type = types[idx++];
+        state.board[r][c].special = null;
+        syncGemEl(r, c);
+      }
+    }
+  }
+  updateHUD();
+}
+
+/* ============================================================
+   POWER-UP ACTIVATION
+   ============================================================ */
+document.querySelectorAll('.pu-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const pu = btn.dataset.pu;
+    if (pu === 'shuffle') { shuffleBoard(); return; }
+    if (state.score < (pu === 'hammer' ? 100 : 300)) return;
+    // Toggle active mode
+    if (state.activePU === pu) {
+      clearPowerup();
+    } else {
+      clearPowerup();
+      state.activePU = pu;
+      btn.classList.add('active-pu');
+    }
+  });
+});
+
+function clearPowerup() {
+  state.activePU = null;
+  document.querySelectorAll('.pu-btn').forEach(b => b.classList.remove('active-pu'));
+}
+
+/* ============================================================
+   GAME START / RESTART
+   ============================================================ */
+function startLevel(lvl) {
+  state.level = lvl;
+  const cfg = getLevelConfig(lvl);
+  state.score    = 0;
+  state.moves    = cfg.moves;
+  state.target   = cfg.target;
+  state.objective = cfg.objective;
+  state.objProgress = 0;
+  state.chainCount  = 0;
+  state.selected = null;
+  state.busy     = false;
+  state.activePU = null;
+  document.querySelectorAll('.pu-btn').forEach(b => b.classList.remove('active-pu'));
+  createBoard();
+  renderGrid();
+  updateHUD();
+  showScreen('game-screen');
+}
+
+/* ============================================================
+   SCREEN NAVIGATION
+   ============================================================ */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+/* ============================================================
+   LEVEL GRID (MENU)
+   ============================================================ */
+function buildLevelGrid() {
+  const data = loadProgress();
+  const grid = document.getElementById('level-grid');
+  grid.innerHTML = '';
+  let maxUnlocked = 1;
+  for (let k in data) if (data[k]) maxUnlocked = Math.max(maxUnlocked, +k + 1);
+
+  for (let i = 1; i <= LEVEL_COUNT; i++) {
+    const btn = document.createElement('button');
+    btn.className = 'lvl-btn ' + (i <= maxUnlocked ? 'unlocked' : 'locked');
+    const stars = data[i] ? '⭐'.repeat(data[i].stars) : '';
+    btn.innerHTML = `${i}<br><span class="stars">${stars}</span>`;
+    if (i <= maxUnlocked) {
+      btn.addEventListener('click', () => startLevel(i));
+    }
+    grid.appendChild(btn);
+  }
+}
+
+/* ============================================================
+   LEADERBOARD
+   ============================================================ */
+function showLeaderboard() {
+  const data = loadProgress();
+  const tbody = document.getElementById('lb-body');
+  tbody.innerHTML = '';
+  for (let i = 1; i <= LEVEL_COUNT; i++) {
+    if (data[i]) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${i}</td><td>${data[i].score.toLocaleString()}</td><td>${'⭐'.repeat(data[i].stars)}</td>`;
+      tbody.appendChild(tr);
+    }
+  }
+  showScreen('lb-screen');
+}
+
+/* ============================================================
+   BUTTON WIRING
+   ============================================================ */
+document.getElementById('btn-play').addEventListener('click', () => {
+  buildLevelGrid();
+  startLevel(1);
+});
+document.getElementById('btn-lb').addEventListener('click', () => {
+  buildLevelGrid();
+  showLeaderboard();
+});
+document.getElementById('btn-lb-back').addEventListener('click', () => {
+  buildLevelGrid();
+  showScreen('menu-screen');
+});
+document.getElementById('btn-menu').addEventListener('click', () => {
+  buildLevelGrid();
+  showScreen('menu-screen');
+});
+
+// Level complete
+document.getElementById('btn-retry').addEventListener('click', () => {
+  document.getElementById('lvl-overlay').classList.remove('show');
+  startLevel(state.level);
+});
+document.getElementById('btn-next').addEventListener('click', () => {
+  document.getElementById('lvl-overlay').classList.remove('show');
+  if (state.level < LEVEL_COUNT) startLevel(state.level + 1);
+  else { buildLevelGrid(); showScreen('menu-screen'); }
+});
+
+// Game over
+document.getElementById('btn-over-menu').addEventListener('click', () => {
+  document.getElementById('over-overlay').classList.remove('show');
+  buildLevelGrid();
+  showScreen('menu-screen');
+});
+document.getElementById('btn-over-retry').addEventListener('click', () => {
+  document.getElementById('over-overlay').classList.remove('show');
+  startLevel(state.level);
+});
+
+/* ============================================================
+   UTILITY
+   ============================================================ */
+function delay(ms) { return new Promise(res => setTimeout(res, ms)); }
+
+/* ============================================================
+   INIT
+   ============================================================ */
+buildLevelGrid();
+showScreen('menu-screen');
+</script>
+</body>
+</html>
