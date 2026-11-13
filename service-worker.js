@@ -3,10 +3,10 @@
    PWA offline caching with network-first strategy
    ============================================================ */
 
-const CACHE_NAME = 'saleh-gaming-v1';
+const CACHE_NAME = 'saleh-gaming-v2';
 const OFFLINE_URL = '/offline.html';
 
-// Assets to pre-cache
+// Assets to pre-cache (original 10 + new 10 games)
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
@@ -14,6 +14,7 @@ const PRECACHE_ASSETS = [
   '/script.js',
   '/manifest.json',
   '/offline.html',
+  // ── Original 10 games ──────────────────────────────────────
   '/games/snake.html',
   '/games/2048.html',
   '/games/tictactoe.html',
@@ -24,9 +25,22 @@ const PRECACHE_ASSETS = [
   '/games/zombie.html',
   '/games/chess.html',
   '/games/bubble.html',
+  // ── New 10 games ───────────────────────────────────────────
+  '/games/super-platformer.html',
+  '/games/zombie-survival.html',
+  '/games/street-racing.html',
+  '/games/shadow-fighter.html',
+  '/games/tower-defense.html',
+  '/games/galaxy-attack.html',
+  '/games/football-stars.html',
+  '/games/dungeon-quest.html',
+  '/games/jewel-match.html',
+  '/games/basketball-challenge.html',
+  // ── PWA icons & character assets ───────────────────────────
   '/assets/icons/icon-192.png',
   '/assets/icons/icon-512.png',
-  '/assets/icons/favicon.png'
+  '/assets/icons/favicon.png',
+  '/assets/images/super-hero.png'
 ];
 
 // Install: pre-cache core assets

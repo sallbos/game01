@@ -593,3 +593,35 @@ img { max-width: 100%; }
 .section:not(.hidden) > * {
   animation: fadeInUp 0.4s ease both;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   NEW GAME TAG STYLES (Games 11–20)
+══════════════════════════════════════════════════════════════ */
+.tag-adventure { background: rgba(0,220,100,0.18);  color: #00dc64; }
+.tag-fighting  { background: rgba(255,80,80,0.18);   color: #ff7070; }
+.tag-sports    { background: rgba(255,200,0,0.18);   color: #ffd040; }
+
+/* ══════════════════════════════════════════════════════════════
+   NEW GAME THUMBNAIL BACKGROUNDS (Games 11–20)
+══════════════════════════════════════════════════════════════ */
+.game-bg-platformer      { background: linear-gradient(135deg, #0a1f3a, #0d3366); }
+.game-bg-zombie-survival { background: linear-gradient(135deg, #0d1a00, #1a3300); }
+.game-bg-street-racing   { background: linear-gradient(135deg, #1a0a00, #332200); }
+.game-bg-shadow-fighter  { background: linear-gradient(135deg, #0d0014, #1a0028); }
+.game-bg-tower-defense   { background: linear-gradient(135deg, #001a0a, #002d1a); }
+.game-bg-galaxy          { background: linear-gradient(135deg, #000510, #040020); }
+.game-bg-football        { background: linear-gradient(135deg, #001a00, #003300); }
+.game-bg-dungeon         { background: linear-gradient(135deg, #1a1000, #2d1800); }
+.game-bg-jewel           { background: linear-gradient(135deg, #1a0028, #2d004a); }
+.game-bg-basketball      { background: linear-gradient(135deg, #1a0a00, #2d1500); }
+
+/* ── Filter tabs scroll on small screens ─────────────────────── */
+@media (max-width: 600px) {
+  .filter-tabs {
+    flex-wrap: nowrap; overflow-x: auto;
+    scrollbar-width: none; -ms-overflow-style: none;
+    padding-bottom: 4px;
+  }
+  .filter-tabs::-webkit-scrollbar { display: none; }
+  .filter-btn { flex-shrink: 0; }
+}

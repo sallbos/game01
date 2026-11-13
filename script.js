@@ -7,6 +7,7 @@
 
 // ── Game Data ──────────────────────────────────────────────────
 const GAMES = [
+  // ── Original 10 Games ──────────────────────────────────────
   {
     id: 'snake',
     title: 'Snake',
@@ -96,6 +97,97 @@ const GAMES = [
     desc: 'Aim and shoot bubbles to pop clusters of matching colors!',
     instructions: '🎮 Desktop: Move mouse to aim, click to shoot. 📱 Mobile: Tap to aim and shoot. Match 3 or more bubbles of the same color to pop them. Clear the board to win!',
     bg: 'game-bg-bubble'
+  },
+  // ── New 10 Games (11–20) ────────────────────────────────────
+  {
+    id: 'super-platformer',
+    title: 'Super Platformer',
+    emoji: '🦸',
+    tags: ['action', 'adventure'],
+    desc: 'Run, jump, defeat enemies and collect coins across multiple levels!',
+    instructions: '🎮 Desktop: Arrow Keys / WASD to move, Space / Up to jump. 📱 Mobile: On-screen buttons. Collect all coins, dodge enemies and reach the flag!',
+    bg: 'game-bg-platformer'
+  },
+  {
+    id: 'zombie-survival',
+    title: 'Zombie Survival',
+    emoji: '🔫',
+    tags: ['action', 'arcade'],
+    desc: 'Top-down zombie shooter with weapons, ammo, and endless waves!',
+    instructions: '🎮 Desktop: WASD to move, mouse aim, click/Space to shoot, R to reload. 📱 Mobile: Left joystick to move, right side to aim and fire. Survive all waves!',
+    bg: 'game-bg-zombie-survival'
+  },
+  {
+    id: 'street-racing',
+    title: 'Street Racing',
+    emoji: '🏁',
+    tags: ['arcade', 'action'],
+    desc: 'Nitro-boosted street racing with traffic, drifting and speed thrills!',
+    instructions: '🎮 Desktop: ← → Arrows to steer, Up/W to accelerate, Space for nitro. 📱 Mobile: Touch buttons. Overtake traffic and beat your distance record!',
+    bg: 'game-bg-street-racing'
+  },
+  {
+    id: 'shadow-fighter',
+    title: 'Shadow Fighter',
+    emoji: '👊',
+    tags: ['action', 'fighting'],
+    desc: '2D fighting game with punches, kicks, combos and special moves!',
+    instructions: '🎮 Desktop: WASD move/jump, J=Punch, K=Kick, L=Special. AI opponent. 📱 Mobile: On-screen fighter buttons. Win 3 rounds to become champion!',
+    bg: 'game-bg-shadow-fighter'
+  },
+  {
+    id: 'tower-defense',
+    title: 'Tower Defense',
+    emoji: '🗼',
+    tags: ['strategy', 'puzzle'],
+    desc: 'Build towers, stop enemy waves, upgrade defenses and protect your base!',
+    instructions: '🎮 Click / Tap empty tiles to build towers. Use gold to build and upgrade. Different tower types target different enemies. Don\'t let enemies reach the end!',
+    bg: 'game-bg-tower-defense'
+  },
+  {
+    id: 'galaxy-attack',
+    title: 'Galaxy Attack',
+    emoji: '🌌',
+    tags: ['arcade', 'action'],
+    desc: 'Epic space shooter with boss battles, power-ups and laser storms!',
+    instructions: '🎮 Desktop: ← → Arrows / A D to move, Space to shoot, collect power-ups. 📱 Mobile: Touch left/right to move, tap shoot button. Defeat the alien boss!',
+    bg: 'game-bg-galaxy'
+  },
+  {
+    id: 'football-stars',
+    title: 'Football Stars',
+    emoji: '⚽',
+    tags: ['sports', 'arcade'],
+    desc: 'Penalty shootout — aim, power up and score past the goalkeeper!',
+    instructions: '🎮 Desktop: Move mouse to aim, hold/release Space or click to control power. 📱 Mobile: Drag to aim, tap shoot button. Score 5 out of 7 to win the tournament!',
+    bg: 'game-bg-football'
+  },
+  {
+    id: 'dungeon-quest',
+    title: 'Dungeon Quest',
+    emoji: '⚔️',
+    tags: ['adventure', 'action'],
+    desc: 'Explore procedural dungeons, battle monsters, loot treasure, fight bosses!',
+    instructions: '🎮 Desktop: WASD / Arrow Keys to move, Space to attack, E to interact. 📱 Mobile: D-pad + attack button. Find the exit key and reach the stairs!',
+    bg: 'game-bg-dungeon'
+  },
+  {
+    id: 'jewel-match',
+    title: 'Jewel Match',
+    emoji: '💎',
+    tags: ['puzzle'],
+    desc: 'Match 3 glittering jewels! Combos, power-ups and 20 dazzling levels!',
+    instructions: '🎮 Click / Tap a gem then click/tap an adjacent gem to swap. Match 3 or more in a row to clear them. Use special gems for chain reactions! Complete the target to advance.',
+    bg: 'game-bg-jewel'
+  },
+  {
+    id: 'basketball-challenge',
+    title: 'Basketball Challenge',
+    emoji: '🏀',
+    tags: ['sports', 'arcade'],
+    desc: 'Shoot hoops with realistic ball physics. Beat the clock and score big!',
+    instructions: '🎮 Desktop: Hold mouse button to aim arc, release to shoot. 📱 Mobile: Touch and drag to aim, release to shoot. The basket moves — time your shot perfectly!',
+    bg: 'game-bg-basketball'
   }
 ];
 
