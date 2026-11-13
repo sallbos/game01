@@ -40,7 +40,8 @@ const PRECACHE_ASSETS = [
   '/assets/icons/icon-192.png',
   '/assets/icons/icon-512.png',
   '/assets/icons/favicon.png',
-  '/assets/images/super-hero.png'
+  '/assets/images/super-hero.png',
+  '/assets/images/super-hero-data.js'
 ];
 
 // Install: pre-cache core assets
