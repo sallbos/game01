@@ -3,7 +3,7 @@
    PWA offline caching with network-first strategy
    ============================================================ */
 
-const CACHE_NAME = 'saleh-gaming-v2';
+const CACHE_NAME = 'saleh-gaming-v3';
 const OFFLINE_URL = '/offline.html';
 
 // Assets to pre-cache (original 10 + new 10 games)
@@ -41,7 +41,9 @@ const PRECACHE_ASSETS = [
   '/assets/icons/icon-512.png',
   '/assets/icons/favicon.png',
   '/assets/images/super-hero.png',
-  '/assets/images/super-hero-data.js'
+  '/assets/images/super-hero-idle.png',
+  '/assets/images/super-hero-data.js',
+  '/assets/images/super-hero-idle-data.js'
 ];
 
 // Install: pre-cache core assets

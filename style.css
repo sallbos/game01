@@ -375,6 +375,38 @@ img { max-width: 100%; }
   min-height: 560px;
 }
 
+/* Fullscreen mode on game container */
+.player-frame:fullscreen,
+.player-frame:-webkit-full-screen,
+.player-frame:-moz-full-screen,
+.player-frame:-ms-fullscreen {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: #000000 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+}
+
+.player-frame:fullscreen iframe,
+.player-frame:-webkit-full-screen iframe,
+.player-frame:-moz-full-screen iframe,
+.player-frame:-ms-fullscreen iframe {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  border: none !important;
+  object-fit: contain !important;
+}
+
 /* ══════════════════════════════════════════════════════════════
    ABOUT
 ══════════════════════════════════════════════════════════════ */

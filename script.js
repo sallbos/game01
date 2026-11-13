@@ -287,6 +287,42 @@ function setFilter(filter, btn) {
   renderGamesGrid();
 }
 
+// ── Fullscreen Helper ──────────────────────────────────────────
+function requestElementFullscreen(el) {
+  if (!el) return;
+  try {
+    if (el.requestFullscreen) {
+      el.requestFullscreen().catch(() => {});
+    } else if (el.webkitRequestFullscreen) {
+      el.webkitRequestFullscreen();
+    } else if (el.webkitRequestFullScreen) {
+      el.webkitRequestFullScreen();
+    } else if (el.mozRequestFullScreen) {
+      el.mozRequestFullScreen();
+    } else if (el.msRequestFullscreen) {
+      el.msRequestFullscreen();
+    }
+  } catch (err) {
+    // If fullscreen is blocked or not allowed, continue normally without error
+  }
+}
+
+function exitFullscreenSafely() {
+  try {
+    if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement) {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      } else if (document.mozCancelFullScreen) {
+        document.mozCancelFullScreen();
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+      }
+    }
+  } catch (err) {}
+}
+
 // ── Game Launcher ──────────────────────────────────────────────
 function launchGame(gameId) {
   const game = GAMES.find(g => g.id === gameId);
@@ -305,13 +341,20 @@ function launchGame(gameId) {
   iframe.src = `games/${gameId}.html`;
   iframe.title = game.title;
   iframe.allow = 'fullscreen';
+  iframe.setAttribute('allowfullscreen', 'true');
+  iframe.setAttribute('webkitallowfullscreen', 'true');
+  iframe.setAttribute('mozallowfullscreen', 'true');
   iframe.style.cssText = 'width:100%;height:100%;border:none;min-height:560px;display:block;';
   frame.appendChild(iframe);
 
   showSection('player');
+
+  // Trigger fullscreen directly inside user click handler
+  requestElementFullscreen(frame);
 }
 
 function exitGame() {
+  exitFullscreenSafely();
   currentGame = null;
   const frame = document.getElementById('playerFrame');
   frame.innerHTML = '';
@@ -326,16 +369,12 @@ function restartCurrentGame() {
   }
 }
 
-function toggleFullscreen() {
-  const frame = document.getElementById('playerFrame');
-  const iframe = frame.querySelector('iframe');
-  const el = iframe || frame;
-  if (!document.fullscreenElement) {
-    el.requestFullscreen && el.requestFullscreen();
-  } else {
-    document.exitFullscreen && document.exitFullscreen();
+// Listen for Escape key to exit fullscreen smoothly if needed
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' || e.code === 'Escape') {
+    exitFullscreenSafely();
   }
-}
+});
 
 // ── Contact Form ───────────────────────────────────────────────
 function handleContact(e) {
