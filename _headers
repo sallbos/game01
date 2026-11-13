@@ -1,9 +1,8 @@
+
 /*
-  SALEH GAMING — Netlify _headers
-  Security and caching headers for static hosting
+  SALEH GAMING — Security and caching headers
 */
 
-# All pages: security headers
 /*
   X-Frame-Options: SAMEORIGIN
   X-Content-Type-Options: nosniff
@@ -11,25 +10,21 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
 
-# Service Worker: no cache
 /service-worker.js
   Cache-Control: no-cache, no-store, must-revalidate
 
-# PWA Manifest
 /manifest.json
   Content-Type: application/manifest+json
   Cache-Control: public, max-age=86400
 
-# Static assets: long cache
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 
-# Game files: moderate cache (1 day)
 /games/*
   Cache-Control: public, max-age=86400
 
-# CSS/JS: moderate cache
 /style.css
   Cache-Control: public, max-age=86400
+
 /script.js
   Cache-Control: public, max-age=86400
