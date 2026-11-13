@@ -64,6 +64,7 @@
     <div class="mBtn" id="btnJump">▲</div>
   </div>
 </div>
+<script src="../assets/images/super-hero-data.js"></script>
 <script>
 'use strict';
 // ─── CANVAS SETUP ───────────────────────────────────────────────────────────
@@ -74,11 +75,21 @@ const W = 800, H = 480;
 // Enable crisp pixel-art scaling
 ctx.imageSmoothingEnabled = false;
 
-// Load Custom Hero Sprite Sheet
+// Load Custom Hero Sprite Sheet (support data-uri instant load with file fallback)
 const heroImg = new Image();
 let heroImgLoaded = false;
 heroImg.onload = () => { heroImgLoaded = true; };
-heroImg.src = '../assets/images/super-hero.png';
+heroImg.onerror = () => {
+  if (heroImg.src.startsWith('data:') && !heroImgLoaded) {
+    heroImg.src = '../assets/images/super-hero.png';
+  }
+};
+if (typeof window !== 'undefined' && window.SUPER_HERO_SPRITE_B64) {
+  heroImg.src = window.SUPER_HERO_SPRITE_B64;
+  if (heroImg.complete && heroImg.naturalWidth > 0) heroImgLoaded = true;
+} else {
+  heroImg.src = '../assets/images/super-hero.png';
+}
 
 // ─── INPUT ──────────────────────────────────────────────────────────────────
 const keys = {};
@@ -1245,14 +1256,14 @@ const game = {
 
     // Sprite frame dimensions from sheet
     const SPRITE_FRAMES = [
-      { sx: 63,  sy: 16,  sw: 140, sh: 301 }, // F0: Idle
-      { sx: 299, sy: 19,  sw: 180, sh: 289 }, // F1: Run 1
-      { sx: 554, sy: 29,  sw: 183, sh: 286 }, // F2: Jump
-      { sx: 818, sy: 19,  sw: 176, sh: 289 }, // F3: Run 2
-      { sx: 40,  sy: 366, sw: 180, sh: 279 }, // F4: Run 3
-      { sx: 306, sy: 353, sw: 181, sh: 261 }, // F5: Fall
-      { sx: 548, sy: 357, sw: 189, sh: 272 }, // F6: Land
-      { sx: 792, sy: 375, sw: 227, sh: 275 }, // F7: Hurt / Attack / Dying
+      { sx: 62,  sy: 15,  sw: 141, sh: 304 }, // F0: Idle
+      { sx: 298, sy: 18,  sw: 181, sh: 291 }, // F1: Run 1
+      { sx: 554, sy: 28,  sw: 184, sh: 288 }, // F2: Jump
+      { sx: 817, sy: 18,  sw: 177, sh: 290 }, // F3: Run 2
+      { sx: 40,  sy: 365, sw: 180, sh: 280 }, // F4: Run 3
+      { sx: 305, sy: 353, sw: 183, sh: 262 }, // F5: Fall
+      { sx: 548, sy: 356, sw: 189, sh: 273 }, // F6: Land
+      { sx: 791, sy: 374, sw: 229, sh: 276 }, // F7: Hurt / Attack / Dying
     ];
 
     // Determine current animation frame
@@ -1484,14 +1495,14 @@ const game = {
     ctx.restore();
 
     // Hero Preview Showcase on Start Screen
-    if (heroImgLoaded && heroImg.complete) {
+    if (heroImgLoaded && heroImg.complete && heroImg.naturalWidth > 0) {
       ctx.save();
       ctx.imageSmoothingEnabled = false;
       const previewBob = Math.sin(this.t * 0.08) * 3;
-      // Idle frame: sx:63, sy:16, sw:140, sh:301
+      // Idle frame: sx:62, sy:15, sw:141, sh:304
       const ph = 64;
-      const pw = Math.round(140 * (ph / 301));
-      ctx.drawImage(heroImg, 63, 16, 140, 301, W/2 - pw/2, titleY + 75 + previewBob, pw, ph);
+      const pw = Math.round(141 * (ph / 304));
+      ctx.drawImage(heroImg, 62, 15, 141, 304, W/2 - pw/2, titleY + 75 + previewBob, pw, ph);
       ctx.restore();
     }
 
